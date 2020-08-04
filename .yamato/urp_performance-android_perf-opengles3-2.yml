@@ -47,9 +47,7 @@ Build_URP_Performance_Android_perf_OpenGLES3_Player_trunk:
       -  | 
          unity-downloader-cli -u trunk -o windows --wait --skip-download -c editor -c il2cpp -c android  > unity_revision.txt
          unity-downloader-cli --source-file unity_revision.txt -p WindowsEditor -c editor -c il2cpp -c android  --wait --published-only
-      -  rm -f WindowsEditor\Data\PlaybackEngines\AndroidPlayer\OpenJDK
-      -  rm -f  WindowsEditor\Data\PlaybackEngines\AndroidPlayer\SDK
-      -  rm -f  WindowsEditor\Data\PlaybackEngines\AndroidPlayer\NDK
+      -  reg add "HKCU\Software\Unity Technologies\Unity Editor 5.x" /v AndroidJVMMaxHeapSize /t REG_DWORD /d 4096 /f
       -  MKLINK /D WINDOWSEDITOR\DATA\PLAYBACKENGINES\ANDROIDPLAYER\OPENJDK %JAVA_HOME%
       -  MKLINK /D WINDOWSEDITOR\DATA\PLAYBACKENGINES\ANDROIDPLAYER\SDK %ANDROID_SDK_ROOT%
       -  MKLINK /D WINDOWSEDITOR\DATA\PLAYBACKENGINES\ANDROIDPLAYER\NDK %ANDROID_NDK_ROOT%
