@@ -1,13 +1,18 @@
-using System;
 using UnityEditor;
 
-namespace UnityEngine.Experimental.Rendering
+namespace UnityEngine.Rendering
 {
+    /// <summary>
+    /// Provides mouse position for debugging purpose.
+    /// </summary>
     public class MousePositionDebug
     {
         // Singleton
         private static MousePositionDebug s_Instance = null;
 
+        /// <summary>
+        /// Singleton instance.
+        /// </summary>
         static public MousePositionDebug instance
         {
             get
@@ -18,18 +23,6 @@ namespace UnityEngine.Experimental.Rendering
                 }
 
                 return s_Instance;
-            }
-        }
-
-        public int debugStep
-        {
-            get
-            {
-#if UNITY_EDITOR
-                return m_DebugStep;
-#else
-                return 0;
-#endif
             }
         }
 
@@ -69,10 +62,6 @@ namespace UnityEngine.Experimental.Rendering
                 instance.m_mousePosition.y = Screen.height - instance.m_mousePosition.y;
                 if (Input.GetMouseButton(1))
                     instance.m_MouseClickPosition = instance.m_mousePosition;
-                if (Input.GetKey(KeyCode.PageUp))
-                    ++instance.m_DebugStep;
-                if (Input.GetKey(KeyCode.PageDown))
-                    instance.m_DebugStep = Mathf.Max(0, instance.m_DebugStep - 1);
                 if (Input.GetKey(KeyCode.End))
                     instance.m_MouseClickPosition = instance.m_mousePosition;
             }
@@ -80,7 +69,6 @@ namespace UnityEngine.Experimental.Rendering
 
         private Vector2 m_mousePosition = Vector2.zero;
         Vector2 m_MouseClickPosition = Vector2.zero;
-        int m_DebugStep = 0;
 
         private void OnSceneGUI(UnityEditor.SceneView sceneview)
         {
@@ -93,14 +81,6 @@ namespace UnityEngine.Experimental.Rendering
                 case EventType.KeyDown:
                     switch (Event.current.keyCode)
                     {
-                        case KeyCode.PageUp:
-                            ++m_DebugStep;
-                            sceneview.Repaint();
-                            break;
-                        case KeyCode.PageDown:
-                            m_DebugStep = Mathf.Max(0, m_DebugStep - 1);
-                            sceneview.Repaint();
-                            break;
                         case KeyCode.End:
                             // Usefull we you don't want to change the scene viewport but still update the mouse click position
                             m_MouseClickPosition = m_mousePosition;
@@ -113,36 +93,37 @@ namespace UnityEngine.Experimental.Rendering
 
 #endif
 
+        /// <summary>
+        /// Initialize the MousePositionDebug class.
+        /// </summary>
         public void Build()
         {
 #if UNITY_EDITOR
-#if UNITY_2019_1_OR_NEWER
             UnityEditor.SceneView.duringSceneGui -= OnSceneGUI;
             UnityEditor.SceneView.duringSceneGui += OnSceneGUI;
-#else
-            UnityEditor.SceneView.onSceneGUIDelegate -= OnSceneGUI;
-            UnityEditor.SceneView.onSceneGUIDelegate += OnSceneGUI;
-#endif
             // Disabled as it cause error: GameViewEventCatcher is only use for SSR debugging currently so comment this code and uncomment it if you want to debug SSR
             //GameViewEventCatcher.Build();
 #endif
         }
 
+        /// <summary>
+        /// Cleanup the MousePositionDebug class.
+        /// </summary>
         public void Cleanup()
         {
 #if UNITY_EDITOR
-#if UNITY_2019_1_OR_NEWER
-            UnityEditor.SceneView.duringSceneGui -= OnSceneGUI;            
-#else
-            UnityEditor.SceneView.onSceneGUIDelegate -= OnSceneGUI;
-#endif
+            UnityEditor.SceneView.duringSceneGui -= OnSceneGUI;
             // Disabled as it cause error: GameViewEventCatcher is only use for SSR debugging currently so comment this code and uncomment it if you want to debug SSR
             //GameViewEventCatcher.Cleanup();
 #endif
         }
 
-        // This function can either return the mouse position in the scene view
-        // or in the game/game view.
+       /// <summary>
+       /// Get the mouse position in the scene or game view.
+       /// </summary>
+       /// <param name="ScreenHeight">Window height.</param>
+       /// <param name="sceneView">Get position in the scene view?</param>
+       /// <returns>Coordinates of the mouse in the specified window.</returns>
         public Vector2 GetMousePosition(float ScreenHeight, bool sceneView)
         {
 #if UNITY_EDITOR
@@ -162,8 +143,8 @@ namespace UnityEngine.Experimental.Rendering
                 }
                 else
                 {
-                    // In non-play mode, only m_mousePosition is valid. 
-                    // We force -1, -1 as a game view pixel pos to avoid 
+                    // In non-play mode, only m_mousePosition is valid.
+                    // We force -1, -1 as a game view pixel pos to avoid
                     // rendering un-wanted effects
                     return new Vector2(-1.0f, -1.0f);
                 }
@@ -174,6 +155,11 @@ namespace UnityEngine.Experimental.Rendering
 #endif
         }
 
+        /// <summary>
+        /// Returns the position of the mouse click.
+        /// </summary>
+        /// <param name="ScreenHeight">Window height.</param>
+        /// <returns>The coordinates of the mouse click.</returns>
         public Vector2 GetMouseClickPosition(float ScreenHeight)
         {
 #if UNITY_EDITOR

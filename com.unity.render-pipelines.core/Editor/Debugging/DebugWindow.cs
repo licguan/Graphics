@@ -1,13 +1,15 @@
+#if ENABLE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM_PACKAGE
+#define USE_INPUT_SYSTEM
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.Callbacks;
-using UnityEditor.Rendering;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-namespace UnityEditor.Experimental.Rendering
+namespace UnityEditor.Rendering
 {
     #pragma warning disable 414
 
@@ -27,7 +29,7 @@ namespace UnityEditor.Experimental.Rendering
         }
     }
 
-    public sealed class DebugWindow : EditorWindow
+    sealed class DebugWindow : EditorWindow
     {
         static readonly GUIContent k_ResetButtonContent = new GUIContent("Reset");
         //static readonly GUIContent k_SaveButtonContent = new GUIContent("Save");
@@ -73,7 +75,7 @@ namespace UnityEditor.Experimental.Rendering
             }
         }
         static event Action<bool> OnDebugWindowToggled;
-                
+
         [DidReloadScripts]
         static void OnEditorReload()
         {
@@ -128,7 +130,7 @@ namespace UnityEditor.Experimental.Rendering
             s_TypeMapDirty = false;
         }
 
-        [MenuItem("Window/Analysis/Render Pipeline Debug", priority = 112)] // 112 is hardcoded number given by the UxTeam to fit correctly in the Windows menu
+        [MenuItem("Window/Render Pipeline/Render Pipeline Debug", priority = 10005)] // 112 is hardcoded number given by the UxTeam to fit correctly in the Windows menu
         static void Init()
         {
             var window = GetWindow<DebugWindow>();
@@ -376,11 +378,14 @@ namespace UnityEditor.Experimental.Rendering
             //GUILayout.Button(k_LoadButtonContent, EditorStyles.toolbarButton);
             //GUILayout.Button(k_SaveButtonContent, EditorStyles.toolbarButton);
             if (GUILayout.Button(k_ResetButtonContent, EditorStyles.toolbarButton))
-            {
                 DebugManager.instance.Reset();
-                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-            }
             GUILayout.EndHorizontal();
+
+            // We check if the legacy input manager is not here because we can have both the new and old input system at the same time
+            // and in this case the debug menu works correctly.
+#if !ENABLE_LEGACY_INPUT_MANAGER
+            EditorGUILayout.HelpBox("The debug menu does not support the new Unity Input package yet. inputs will be disabled in play mode and build.", MessageType.Error);
+#endif
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -435,7 +440,7 @@ namespace UnityEditor.Experimental.Rendering
 
                     m_PanelScroll = scrollScope.scrollPosition;
                 }
-                
+
                 Rect splitterRect = new Rect(splitterPos - 3, 0, 6, Screen.height);
                 GUI.Box(splitterRect, "", s_SplitterLeft);
 

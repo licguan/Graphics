@@ -1,7 +1,11 @@
+using System.Collections;
 using UnityEngine.UI;
 
-namespace UnityEngine.Experimental.Rendering.UI
+namespace UnityEngine.Rendering.UI
 {
+    /// <summary>
+    /// DebugUIHandler for toggle with history widget.
+    /// </summary>
     public class DebugUIHandlerToggleHistory : DebugUIHandlerToggle
     {
         Toggle[] historyToggles;
@@ -26,10 +30,13 @@ namespace UnityEngine.Experimental.Rendering.UI
             }
 
             //this call UpdateValueLabel which will rely on historyToggles
-            base.SetWidget(widget); 
+            base.SetWidget(widget);
         }
 
-        protected override void UpdateValueLabel()
+        /// <summary>
+        /// Update the label.
+        /// </summary>
+        internal protected override void UpdateValueLabel()
         {
             base.UpdateValueLabel();
             DebugUI.HistoryBoolField field = m_Field as DebugUI.HistoryBoolField;
@@ -39,6 +46,15 @@ namespace UnityEngine.Experimental.Rendering.UI
                 if (index < historyToggles.Length && historyToggles[index] != null)
                     historyToggles[index].isOn = field.GetHistoryValue(index);
             }
+
+            if (isActiveAndEnabled)
+                StartCoroutine(RefreshAfterSanitization());
+        }
+
+        IEnumerator RefreshAfterSanitization()
+        {
+            yield return null; //wait one frame
+            valueToggle.isOn = m_Field.getter();
         }
     }
 }

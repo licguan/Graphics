@@ -1,15 +1,19 @@
 using System;
 using UnityEngine.UI;
 
-namespace UnityEngine.Experimental.Rendering.UI
+namespace UnityEngine.Rendering.UI
 {
+    /// <summary>
+    /// DebugUIHandler for enumerator widget.
+    /// </summary>
     public class DebugUIHandlerEnumField : DebugUIHandlerWidget
     {
         public Text nextButtonText;
         public Text previousButtonText;
         public Text nameLabel;
+        /// <summary>Value of the enum field.</summary>
         public Text valueLabel;
-        protected DebugUI.EnumField m_Field;
+        internal protected DebugUI.EnumField m_Field;
 
         internal override void SetWidget(DebugUI.Widget widget)
         {
@@ -19,6 +23,12 @@ namespace UnityEngine.Experimental.Rendering.UI
             UpdateValueLabel();
         }
 
+        /// <summary>
+        /// OnSelection implementation.
+        /// </summary>
+        /// <param name="fromNext">True if the selection wrapped around.</param>
+        /// <param name="previous">Previous widget.</param>
+        /// <returns>State of the widget.</returns>
         public override bool OnSelection(bool fromNext, DebugUIHandlerWidget previous)
         {
             nextButtonText.color = colorSelected;
@@ -28,6 +38,9 @@ namespace UnityEngine.Experimental.Rendering.UI
             return true;
         }
 
+        /// <summary>
+        /// OnDeselection implementation.
+        /// </summary>
         public override void OnDeselection()
         {
             nextButtonText.color = colorDefault;
@@ -36,11 +49,18 @@ namespace UnityEngine.Experimental.Rendering.UI
             valueLabel.color = colorDefault;
         }
 
+        /// <summary>
+        /// OnAction implementation.
+        /// </summary>
         public override void OnAction()
         {
             OnIncrement(false);
         }
 
+        /// <summary>
+        /// OnIncrement implementation.
+        /// </summary>
+        /// <param name="fast">True if incrementing fast.</param>
         public override void OnIncrement(bool fast)
         {
             if (m_Field.enumValues.Length == 0)
@@ -88,6 +108,10 @@ namespace UnityEngine.Experimental.Rendering.UI
             UpdateValueLabel();
         }
 
+        /// <summary>
+        /// OnDecrement implementation.
+        /// </summary>
+        /// <param name="fast">Trye if decrementing fast.</param>
         public override void OnDecrement(bool fast)
         {
             if (m_Field.enumValues.Length == 0)
@@ -144,6 +168,9 @@ namespace UnityEngine.Experimental.Rendering.UI
             UpdateValueLabel();
         }
 
+        /// <summary>
+        /// Update the label of the widget.
+        /// </summary>
         protected virtual void UpdateValueLabel()
         {
             int index = m_Field.currentIndex;
@@ -152,7 +179,7 @@ namespace UnityEngine.Experimental.Rendering.UI
             if (index < 0)
                 index = 0;
 
-            valueLabel.text = m_Field.enumNames[index].text;
+            valueLabel.text = "< " + m_Field.enumNames[index].text + " >";
         }
     }
 }

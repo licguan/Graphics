@@ -1,11 +1,17 @@
 using UnityEngine.UI;
 
-namespace UnityEngine.Experimental.Rendering.UI
+namespace UnityEngine.Rendering.UI
 {
+    /// <summary>
+    /// DebugUIHandler for panels.
+    /// </summary>
     public class DebugUIHandlerPanel : MonoBehaviour
     {
+        /// <summary>Name of the panel.</summary>
         public Text nameLabel;
+        /// <summary>Scroll rect of the panel.</summary>
         public ScrollRect scrollRect;
+        /// <summary>Viewport of the panel.</summary>
         public RectTransform viewport;
         public DebugUIHandlerCanvas Canvas;
 
@@ -13,7 +19,7 @@ namespace UnityEngine.Experimental.Rendering.UI
         RectTransform m_ContentTransform;
         RectTransform m_MaskTransform;
 
-        protected DebugUI.Panel m_Panel;
+        internal protected DebugUI.Panel m_Panel;
 
         void OnEnable()
         {
@@ -25,7 +31,7 @@ namespace UnityEngine.Experimental.Rendering.UI
         internal void SetPanel(DebugUI.Panel panel)
         {
             m_Panel = panel;
-            nameLabel.text = panel.displayName;
+            nameLabel.text = "< " + panel.displayName + " >";
         }
 
         internal DebugUI.Panel GetPanel()

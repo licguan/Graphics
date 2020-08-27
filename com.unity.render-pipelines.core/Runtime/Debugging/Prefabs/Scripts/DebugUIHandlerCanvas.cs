@@ -3,21 +3,31 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.Rendering;
 
-namespace UnityEngine.Experimental.Rendering.UI
+namespace UnityEngine.Rendering.UI
 {
+    /// <summary>
+    /// Debug UI Prefab bundle.
+    /// </summary>
     [Serializable]
     public class DebugUIPrefabBundle
     {
+        /// <summary>type of the widget.</summary>
         public string type;
+        /// <summary>Prefab for the widget.</summary>
         public RectTransform prefab;
     }
 
+    /// <summary>
+    /// DebugUIHandler for canvas widget.
+    /// </summary>
     public class DebugUIHandlerCanvas : MonoBehaviour
     {
         int m_DebugTreeState;
         Dictionary<Type, Transform> m_PrefabsMap;
 
+        /// <summary>Panel prefab.</summary>
         public Transform panelPrefab;
+        /// <summary>List of prefabs.</summary>
         public List<DebugUIPrefabBundle> prefabs;
 
         List<DebugUIHandlerPanel> m_UIPanels;
@@ -177,7 +187,7 @@ namespace UnityEngine.Experimental.Rendering.UI
             ChangeSelection(widget, true);
         }
 
-        public void ChangeSelection(DebugUIHandlerWidget widget, bool fromNext)
+        internal void ChangeSelection(DebugUIHandlerWidget widget, bool fromNext)
         {
             if (widget == null)
                 return;
@@ -270,11 +280,19 @@ namespace UnityEngine.Experimental.Rendering.UI
             if (DebugManager.instance.GetAction(DebugAction.PreviousDebugPanel) != 0f)
             {
                 SelectPreviousPanel();
+                if (index < 0)
+                    index = m_UIPanels.Count - 1;
+                index = Mathf.Clamp(index, 0, m_UIPanels.Count - 1);
+                ActivatePanel(index);
             }
 
             if (DebugManager.instance.GetAction(DebugAction.NextDebugPanel) != 0f)
             {
                 SelectNextPanel();
+                if (index >= m_UIPanels.Count)
+                    index = 0;
+                index = Mathf.Clamp(index, 0, m_UIPanels.Count - 1);
+                ActivatePanel(index);
             }
 
             if (DebugManager.instance.GetAction(DebugAction.Action) != 0f)

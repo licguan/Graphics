@@ -2,23 +2,33 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine.Assertions;
-using UnityEngine.Experimental.Rendering.UI;
-using UnityEngine.Rendering;
+using UnityEngine.Rendering.UI;
 
-namespace UnityEngine.Experimental.Rendering
+namespace UnityEngine.Rendering
 {
     using UnityObject = UnityEngine.Object;
 
+    /// <summary>
+    /// IDebugData interface.
+    /// </summary>
     public interface IDebugData
     {
+        /// <summary>Get the reset callback for this DebugData</summary>
+        /// <returns>The reset callback</returns>
         Action GetReset();
         //Action GetLoad();
         //Action GetSave();
     }
 
+    /// <summary>
+    /// Manager class for the Debug Window.
+    /// </summary>
     public sealed partial class DebugManager
     {
         static readonly Lazy<DebugManager> s_Instance = new Lazy<DebugManager>(() => new DebugManager());
+        /// <summary>
+        /// Global instance of the DebugManager.
+        /// </summary>
         public static DebugManager instance => s_Instance.Value;
 
         ReadOnlyCollection<DebugUI.Panel> m_ReadOnlyPanels;
@@ -30,6 +40,9 @@ namespace UnityEngine.Experimental.Rendering
             m_ReadOnlyPanels = m_Panels.AsReadOnly();
         }
 
+        /// <summary>
+        /// List of currently registered debug panels.
+        /// </summary>
         public ReadOnlyCollection<DebugUI.Panel> panels
         {
             get
@@ -40,11 +53,20 @@ namespace UnityEngine.Experimental.Rendering
             }
         }
 
+        /// <summary>
+        /// Callback called when the runtime UI changed.
+        /// </summary>
         public event Action<bool> onDisplayRuntimeUIChanged = delegate {};
+        /// <summary>
+        /// Callback called when the debug window is dirty.
+        /// </summary>
         public event Action onSetDirty = delegate {};
 
         event Action resetData;
 
+        /// <summary>
+        /// Force an editor request.
+        /// </summary>
         public bool refreshEditorRequested;
 
         GameObject m_Root;
@@ -56,9 +78,19 @@ namespace UnityEngine.Experimental.Rendering
         // Knowing if the DebugWindows is open, is done by event as it is in another assembly.
         // The DebugWindows is responsible to link its event to ToggleEditorUI.
         bool m_EditorOpen = false;
+        /// <summary>
+        /// Is the debug editor window open.
+        /// </summary>
         public bool displayEditorUI => m_EditorOpen;
+        /// <summary>
+        /// Toggle the debug window.
+        /// </summary>
+        /// <param name="open">State of the debug window.</param>
         public void ToggleEditorUI(bool open) => m_EditorOpen = open;
 
+        /// <summary>
+        /// Displays the runtime version of the debug window.
+        /// </summary>
         public bool displayRuntimeUI
         {
             get => m_Root != null && m_Root.activeInHierarchy;
@@ -83,7 +115,9 @@ namespace UnityEngine.Experimental.Rendering
             }
         }
 
-
+        /// <summary>
+        /// Displays the persistent runtime debug window.
+        /// </summary>
         public bool displayPersistentRuntimeUI
         {
             get => m_RootUIPersistentCanvas != null && m_PersistentRoot.activeInHierarchy;
@@ -96,31 +130,55 @@ namespace UnityEngine.Experimental.Rendering
 
         DebugManager()
         {
+            if (!Debug.isDebugBuild)
+                return;
+
             RegisterInputs();
             RegisterActions();
         }
 
+        /// <summary>
+        /// Refresh the debug window.
+        /// </summary>
         public void RefreshEditor()
         {
             refreshEditorRequested = true;
         }
 
+        /// <summary>
+        /// Reset the debug window.
+        /// </summary>
         public void Reset()
         {
             resetData?.Invoke();
             ReDrawOnScreenDebug();
         }
 
+        /// <summary>
+        /// Redraw the runtime debug UI.
+        /// </summary>
         public void ReDrawOnScreenDebug()
         {
             if (displayRuntimeUI)
                 m_RootUICanvas?.ResetAllHierarchy();
         }
-        
+
+        /// <summary>
+        /// Register debug data.
+        /// </summary>
+        /// <param name="data">Data to be registered.</param>
         public void RegisterData(IDebugData data) => resetData += data.GetReset();
 
+        /// <summary>
+        /// Register debug data.
+        /// </summary>
+        /// <param name="data">Data to be registered.</param>
         public void UnregisterData(IDebugData data) => resetData -= data.GetReset();
 
+        /// <summary>
+        /// Get hashcode state of the Debug Window.
+        /// </summary>
+        /// <returns></returns>
         public int GetState()
         {
             int hash = 17;
@@ -164,7 +222,7 @@ namespace UnityEngine.Experimental.Rendering
             }
         }
 
-        public void TogglePersistent(DebugUI.Widget widget)
+        internal void TogglePersistent(DebugUI.Widget widget)
         {
             if (widget == null)
                 return;
@@ -186,15 +244,38 @@ namespace UnityEngine.Experimental.Rendering
         }
 
         // TODO: Optimally we should use a query path here instead of a display name
-        public DebugUI.Panel GetPanel(string displayName, bool createIfNull = false, int groupIndex = 0)
+        /// <summary>
+        /// Returns a debug panel.
+        /// </summary>
+        /// <param name="displayName">Name of the debug panel.</param>
+        /// <param name="createIfNull">Create the panel if it does not exists.</param>
+        /// <param name="groupIndex">Group index.</param>
+        /// <param name="overrideIfExist">Replace an existing panel.</param>
+        /// <returns></returns>
+        public DebugUI.Panel GetPanel(string displayName, bool createIfNull = false, int groupIndex = 0, bool overrideIfExist = false)
         {
+            DebugUI.Panel p = null;
+
             foreach (var panel in m_Panels)
             {
                 if (panel.displayName == displayName)
-                    return panel;
+                {
+                    p = panel;
+                    break;
+                }
             }
 
-            DebugUI.Panel p = null;
+            if (p != null)
+            {
+                if (overrideIfExist)
+                {
+                    p.onSetDirty -= OnPanelDirty;
+                    RemovePanel(p);
+                    p = null;
+                }
+                else
+                    return p;
+            }
 
             if (createIfNull)
             {
@@ -208,6 +289,10 @@ namespace UnityEngine.Experimental.Rendering
         }
 
         // TODO: Use a query path here as well instead of a display name
+        /// <summary>
+        /// Remove a debug panel.
+        /// </summary>
+        /// <param name="displayName">Name of the debug panel to remove.</param>
         public void RemovePanel(string displayName)
         {
             DebugUI.Panel panel = null;
@@ -225,6 +310,10 @@ namespace UnityEngine.Experimental.Rendering
             RemovePanel(panel);
         }
 
+        /// <summary>
+        /// Remove a debug panel.
+        /// </summary>
+        /// <param name="panel">Reference to the debug panel to remove.</param>
         public void RemovePanel(DebugUI.Panel panel)
         {
             if (panel == null)
@@ -234,6 +323,11 @@ namespace UnityEngine.Experimental.Rendering
             UpdateReadOnlyCollection();
         }
 
+        /// <summary>
+        /// Get a Debug Item.
+        /// </summary>
+        /// <param name="queryPath">Path of the debug item.</param>
+        /// <returns>Reference to the requested debug item.</returns>
         public DebugUI.Widget GetItem(string queryPath)
         {
             foreach (var panel in m_Panels)
@@ -246,6 +340,12 @@ namespace UnityEngine.Experimental.Rendering
             return null;
         }
 
+        /// <summary>
+        /// Get a debug item from a specific container.
+        /// </summary>
+        /// <param name="queryPath">Path of the debug item.</param>
+        /// <param name="container">Container to query.</param>
+        /// <returns>Reference to the requested debug item.</returns>
         DebugUI.Widget GetItem(string queryPath, DebugUI.IContainer container)
         {
             foreach (var child in container.children)

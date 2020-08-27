@@ -1,10 +1,12 @@
-namespace UnityEngine.Experimental.Rendering
+namespace UnityEngine.Rendering
 {
+    /// <summary>Debug class containing several debug shapes for debugging</summary>
     public partial class DebugShapes
     {
         // Singleton
         static DebugShapes s_Instance = null;
 
+        /// <summary>Singleton instance</summary>
         static public DebugShapes instance
         {
             get
@@ -17,7 +19,7 @@ namespace UnityEngine.Experimental.Rendering
                 return s_Instance;
             }
         }
-        
+
         Mesh m_sphereMesh = null;
         Mesh m_boxMesh = null;
         Mesh m_coneMesh = null;
@@ -112,7 +114,7 @@ namespace UnityEngine.Experimental.Rendering
                 triangles[i++] = vertices.Length - (lon + 1) - 1;
             }
 
-            // Assign them to 
+            // Assign them to
             outputMesh.vertices = vertices;
             outputMesh.normals = normals;
             outputMesh.uv = uvs;
@@ -199,7 +201,7 @@ namespace UnityEngine.Experimental.Rendering
             {
 	            // Bottom
 	            3, 1, 0,
-                3, 2, 1,			
+                3, 2, 1,
 	            // Left
 	            3 + 4 * 1, 1 + 4 * 1, 0 + 4 * 1,
                 3 + 4 * 1, 2 + 4 * 1, 1 + 4 * 1,
@@ -470,8 +472,8 @@ namespace UnityEngine.Experimental.Rendering
             m_pyramidMesh = new Mesh();
             BuildPyramid(ref m_pyramidMesh, 1.0f, 1.0f, 1.0f);
         }
-
-        public void CheckResources()
+        
+        void RebuildResources()
         {
             if (m_sphereMesh == null || m_boxMesh == null || m_coneMesh == null || m_pyramidMesh == null)
             {
@@ -479,27 +481,35 @@ namespace UnityEngine.Experimental.Rendering
             }
         }
 
+        /// <summary>Get a Sphere Mesh</summary>
+        /// <returns>A Sphere Mesh</returns>
         public Mesh RequestSphereMesh()
         {
-            CheckResources();
+            RebuildResources();
             return m_sphereMesh;
         }
 
+        /// <summary>Get a Box Mesh</summary>
+        /// <returns>A Box Mesh</returns>
         public Mesh RequestBoxMesh()
         {
-            CheckResources();
+            RebuildResources();
             return m_boxMesh;
         }
 
+        /// <summary>Get a Cone Mesh</summary>
+        /// <returns>A Cone Mesh</returns>
         public Mesh RequestConeMesh()
         {
-            CheckResources();
+            RebuildResources();
             return m_coneMesh;
         }
 
+        /// <summary>Get a Pyramid Mesh</summary>
+        /// <returns>A Pyramid Mesh</returns>
         public Mesh RequestPyramidMesh()
         {
-            CheckResources();
+            RebuildResources();
             return m_pyramidMesh;
         }
     }

@@ -1,15 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEditorInternal;
 using UnityEngine.Rendering;
 
-namespace UnityEngine.Experimental.Rendering.UI
+namespace UnityEngine.Rendering.UI
 {
     [CustomEditor(typeof(DebugUIHandlerCanvas))]
-    public sealed class DebugUIHandlerCanvasEditor : Editor
+    sealed class DebugUIHandlerCanvasEditor : Editor
     {
         SerializedProperty m_PanelPrefab;
         SerializedProperty m_Prefabs;
@@ -20,16 +19,14 @@ namespace UnityEngine.Experimental.Rendering.UI
 
         static DebugUIHandlerCanvasEditor()
         {
-            IEnumerable<Type> derivedTypes = CoreUtils.GetAllTypesDerivedFrom<DebugUI.Widget>();
-            IEnumerable<Type> concreteDerivedTypes = derivedTypes.Where(t => !t.IsAbstract);
-
-            s_Types = concreteDerivedTypes.Select(t => t.AssemblyQualifiedName).ToArray();
+            s_Types = CoreUtils.GetAllTypesDerivedFrom<DebugUI.Widget>()
+                .Where(t => !t.IsAbstract)
+                .Select(t => t.AssemblyQualifiedName)
+                .ToArray();
 
             s_DisplayTypes = new string[s_Types.Length];
             for (int i = 0; i < s_Types.Length; i++)
-            {
                 s_DisplayTypes[i] = Type.GetType(s_Types[i]).Name;
-            }
         }
 
         void OnEnable()
