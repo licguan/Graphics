@@ -1,42 +1,14 @@
-#ifndef LIGHTWEIGHT_INPUT_SURFACE_INCLUDED
-#define LIGHTWEIGHT_INPUT_SURFACE_INCLUDED
+#ifndef UNIVERSAL_INPUT_SURFACE_INCLUDED
+#define UNIVERSAL_INPUT_SURFACE_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceData.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
 
 TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
 TEXTURE2D(_BumpMap);            SAMPLER(sampler_BumpMap);
 TEXTURE2D(_EmissionMap);        SAMPLER(sampler_EmissionMap);
-
-// Must match Lightweight ShaderGraph master node
-struct SurfaceData
-{
-    half3 albedo;
-    half3 specular;
-    half  metallic;
-    half  smoothness;
-    half3 normalTS;
-    half3 emission;
-    half  occlusion;
-    half  alpha;
-};
-
-SurfaceData CreateSurfaceData(half3 albedo, half metallic, half3 specular, half smoothness, half occlusion, half3 emission, half alpha, half3 normalTS)
-{
-    SurfaceData surfaceData;
-    
-    surfaceData.albedo = albedo;
-    surfaceData.specular = specular;
-    surfaceData.metallic = metallic;
-    surfaceData.smoothness = smoothness;
-    surfaceData.normalTS = normalTS;
-    surfaceData.emission = emission;
-    surfaceData.occlusion = occlusion;
-    surfaceData.alpha = alpha;
-    
-    return surfaceData;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 //                      Material Property Helpers                            //
