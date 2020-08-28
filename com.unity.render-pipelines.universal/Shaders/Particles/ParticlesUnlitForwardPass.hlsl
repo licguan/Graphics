@@ -1,7 +1,7 @@
-#ifndef LIGHTWEIGHT_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED
-#define LIGHTWEIGHT_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED
+#ifndef UNIVERSAL_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED
+#define UNIVERSAL_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
 struct AttributesParticle
 {
@@ -22,7 +22,7 @@ struct VaryingsParticle
 {
     half4 color                     : COLOR;
     float2 texcoord                 : TEXCOORD0;
-    
+
     float4 positionWS               : TEXCOORD1;
 
 #ifdef _NORMALMAP
@@ -39,10 +39,6 @@ struct VaryingsParticle
 #endif
 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
     float4 projectedPosition        : TEXCOORD6;
-#endif
-
-#if defined(_MAIN_LIGHT_SHADOWS) && !defined(_RECEIVE_SHADOWS_OFF)
-    float4 shadowCoord              : TEXCOORD7;
 #endif
 
     float3 vertexSH                 : TEXCOORD8; // SH
@@ -67,22 +63,17 @@ void InitializeInputData(VaryingsParticle input, half3 normalTS, out InputData o
 #endif
 
     output.normalWS = NormalizeNormalPerPixel(output.normalWS);
-    
+
 #if SHADER_HINT_NICE_QUALITY
     viewDirWS = SafeNormalize(viewDirWS);
 #endif
 
     output.viewDirectionWS = viewDirWS;
-    
-#if defined(_MAIN_LIGHT_SHADOWS) && !defined(_RECEIVE_SHADOWS_OFF)
-    output.shadowCoord = input.shadowCoord;
-#else
-    output.shadowCoord = float4(0, 0, 0, 0);
-#endif
 
     output.fogCoord = (half)input.positionWS.w;
     output.vertexLighting = half3(0.0h, 0.0h, 0.0h);
     output.bakedGI = SampleSHPixel(input.vertexSH, output.normalWS);
+    output.normalizedScreenSpaceUV = input.clipPos.xy;
     output.normalTS = normalTS;
 }
 
@@ -93,11 +84,11 @@ void InitializeInputData(VaryingsParticle input, half3 normalTS, out InputData o
 VaryingsParticle vertParticleUnlit(AttributesParticle input)
 {
     VaryingsParticle output = (VaryingsParticle)0;
-    
+
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-    
+
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.vertex.xyz);
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normal, input.tangent);
 
@@ -105,13 +96,13 @@ VaryingsParticle vertParticleUnlit(AttributesParticle input)
     output.positionWS.xyz = vertexInput.positionWS;
     output.positionWS.w = ComputeFogFactor(vertexInput.positionCS.z);
     output.clipPos = vertexInput.positionCS;
-    output.color = input.color;
-    
-    half3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+    output.color = GetParticleColor(input.color);
+
+    half3 viewDirWS = GetWorldSpaceViewDir(vertexInput.positionWS);
 #if !SHADER_HINT_NICE_QUALITY
     viewDirWS = SafeNormalize(viewDirWS);
 #endif
-    
+
 #ifdef _NORMALMAP
     output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
     output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
@@ -120,13 +111,17 @@ VaryingsParticle vertParticleUnlit(AttributesParticle input)
     output.normalWS = normalInput.normalWS;
     output.viewDirWS = viewDirWS;
 #endif
-    
-    output.texcoord = input.texcoords.xy;
-#ifdef _FLIPBOOKBLENDING_ON
-    output.texcoord2AndBlend.xy = input.texcoords.zw;
-    output.texcoord2AndBlend.z = input.texcoordBlend;
+
+#if defined(_FLIPBOOKBLENDING_ON)
+#if defined(UNITY_PARTICLE_INSTANCING_ENABLED)
+    GetParticleTexcoords(output.texcoord, output.texcoord2AndBlend, input.texcoords.xyxy, 0.0);
+#else
+    GetParticleTexcoords(output.texcoord, output.texcoord2AndBlend, input.texcoords, input.texcoordBlend);
 #endif
-    
+#else
+    GetParticleTexcoords(output.texcoord, input.texcoords.xy);
+#endif
+
 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
     output.projectedPosition = ComputeScreenPos(vertexInput.positionCS);
 #endif
@@ -138,7 +133,7 @@ half4 fragParticleUnlit(VaryingsParticle input) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-    
+
     float2 uv = input.texcoord;
     float3 blendUv = float3(0, 0, 0);
 #if defined(_FLIPBOOKBLENDING_ON)
@@ -151,26 +146,24 @@ half4 fragParticleUnlit(VaryingsParticle input) : SV_Target
 #endif
 
     half4 albedo = SampleAlbedo(uv, blendUv, _BaseColor, input.color, projectedPosition, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
-    
     half3 normalTS = SampleNormalTS(uv, blendUv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap));
-    
-#if defined (_DISTORTION_ON)   
+
+#if defined (_DISTORTION_ON)
     albedo.rgb = Distortion(albedo, normalTS, _DistortionStrengthScaled, _DistortionBlend, projectedPosition);
 #endif
-    
-    half3 diffuse = AlphaModulate(albedo.rgb, albedo.a);
-    half alpha = albedo.a;
-    
+
 #if defined(_EMISSION)
-    half3 emission = BlendTexture(TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap), uv, blendUv) * _EmissionColor.rgb;
+    half3 emission = BlendTexture(TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap), uv, blendUv).rgb * _EmissionColor.rgb;
 #else
     half3 emission = half3(0, 0, 0);
 #endif
 
-    half3 result = diffuse + emission;
+    half3 result = albedo.rgb + emission;
     half fogFactor = input.positionWS.w;
     result = MixFogColor(result, half3(0, 0, 0), fogFactor);
-    return half4(result, alpha);
+    albedo.a = OutputAlpha(albedo.a);
+
+    return half4(result, albedo.a);
 }
 
-#endif // LIGHTWEIGHT_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED
+#endif // UNIVERSAL_PARTICLES_UNLIT_FORWARD_PASS_INCLUDED

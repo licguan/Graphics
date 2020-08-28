@@ -1,7 +1,8 @@
-#ifndef LIGHTWEIGHT_SPEEDTREE7COMMON_PASSES_INCLUDED
-#define LIGHTWEIGHT_SPEEDTREE7COMMON_PASSES_INCLUDED
+#ifndef UNIVERSAL_SPEEDTREE7COMMON_PASSES_INCLUDED
+#define UNIVERSAL_SPEEDTREE7COMMON_PASSES_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
 
 struct SpeedTreeVertexInput
 {
@@ -40,7 +41,7 @@ struct SpeedTreeVertexOutput
         half3 viewDirWS             : TEXCOORD4;
     #endif
 
-    #ifdef _MAIN_LIGHT_SHADOWS
+    #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
         float4 shadowCoord          : TEXCOORD6;
     #endif
 
@@ -58,6 +59,28 @@ struct SpeedTreeVertexDepthOutput
     UNITY_VERTEX_OUTPUT_STEREO
 };
 
+struct SpeedTreeVertexDepthNormalOutput
+{
+    half3 uvHueVariation            : TEXCOORD0;
+    float4 clipPos                  : SV_POSITION;
+
+    #ifdef GEOM_TYPE_BRANCH_DETAIL
+        half3 detail                : TEXCOORD1;
+    #endif
+
+    #ifdef EFFECT_BUMP
+        half4 normalWS              : TEXCOORD2;    // xyz: normal, w: viewDir.x
+        half4 tangentWS             : TEXCOORD3;    // xyz: tangent, w: viewDir.y
+        half4 bitangentWS           : TEXCOORD4;    // xyz: bitangent, w: viewDir.z
+    #else
+        half3 normalWS              : TEXCOORD2;
+        half3 viewDirWS             : TEXCOORD3;
+    #endif
+
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+    UNITY_VERTEX_OUTPUT_STEREO
+};
+
 void InitializeInputData(SpeedTreeVertexOutput input, half3 normalTS, out InputData inputData)
 {
     inputData.positionWS = input.positionWS.xyz;
@@ -67,16 +90,18 @@ void InitializeInputData(SpeedTreeVertexOutput input, half3 normalTS, out InputD
         inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
         inputData.viewDirectionWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
     #else
-        inputData.normalWS = input.normalWS;
+        inputData.normalWS = NormalizeNormalPerPixel(input.normalWS);
         inputData.viewDirectionWS = input.viewDirWS;
     #endif
 
     #if SHADER_HINT_NICE_QUALITY
         inputData.viewDirectionWS = SafeNormalize(inputData.viewDirectionWS);
     #endif
-    
-    #ifdef _MAIN_LIGHT_SHADOWS
+
+    #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
         inputData.shadowCoord = input.shadowCoord;
+    #elif defined(MAIN_LIGHT_CALCULATE_SHADOWS)
+        inputData.shadowCoord = TransformWorldToShadowCoord(inputData.positionWS);
     #else
         inputData.shadowCoord = float4(0, 0, 0, 0);
     #endif
@@ -84,6 +109,7 @@ void InitializeInputData(SpeedTreeVertexOutput input, half3 normalTS, out InputD
     inputData.fogCoord = input.fogFactorAndVertexLight.x;
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
     inputData.bakedGI = half3(0, 0, 0); // No GI currently.
+    inputData.normalizedScreenSpaceUV = input.clipPos.xy;
     inputData.normalTS = normalTS;
     #if defined(LIGHTMAP_ON)
     inputData.lightmapUV = input.lightmapUV;
@@ -95,13 +121,17 @@ void InitializeInputData(SpeedTreeVertexOutput input, half3 normalTS, out InputD
     #endif 
 }
 
+#ifdef GBUFFER
+FragmentOutput SpeedTree7Frag(SpeedTreeVertexOutput input)
+#else
 half4 SpeedTree7Frag(SpeedTreeVertexOutput input) : SV_Target
+#endif
 {
     UNITY_SETUP_INSTANCE_ID(input);
 
 #if !defined(SHADER_QUALITY_LOW)
     #ifdef LOD_FADE_CROSSFADE // enable dithering LOD transition if user select CrossFade transition in LOD group
-        LODDitheringTransition(input.clipPos.xyz, unity_LODFade.x);
+        LODDitheringTransition(input.clipPos.xy, unity_LODFade.x);
     #endif
 #endif
 
@@ -150,10 +180,19 @@ half4 SpeedTree7Frag(SpeedTreeVertexOutput input) : SV_Target
         diffuseColor.rgb *= _Color.rgb;
     #endif
 
-    half4 color = LightweightFragmentBlinnPhong(inputData, diffuseColor.rgb, half4(0, 0, 0, 0), 0, 0, diffuse.a);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    half4 color = UniversalFragmentBlinnPhong(inputData, diffuseColor.rgb, half4(0, 0, 0, 0), 0, 0, diffuse.a);
 
-    return color;
+    #ifdef GBUFFER
+        SurfaceData surfaceData;
+        surfaceData.smoothness = 0;
+        surfaceData.albedo = diffuseColor.rgb;
+        surfaceData.specular = half3(0, 0, 0);
+        return SurfaceDataToGbuffer(surfaceData, inputData, color.rgb, kLightingSimpleLit);
+    #else
+        color.rgb = MixFog(color.rgb, inputData.fogCoord);
+        color.a = OutputAlpha(color.a);
+        return color;
+    #endif
 }
 
 half4 SpeedTree7FragDepth(SpeedTreeVertexDepthOutput input) : SV_Target
@@ -162,7 +201,7 @@ half4 SpeedTree7FragDepth(SpeedTreeVertexDepthOutput input) : SV_Target
 
 #if !defined(SHADER_QUALITY_LOW)
     #ifdef LOD_FADE_CROSSFADE // enable dithering LOD transition if user select CrossFade transition in LOD group
-        LODDitheringTransition(input.clipPos.xyz, unity_LODFade.x);
+        LODDitheringTransition(input.clipPos.xy, unity_LODFade.x);
     #endif
 #endif
 
@@ -180,6 +219,28 @@ half4 SpeedTree7FragDepth(SpeedTreeVertexDepthOutput input) : SV_Target
     #else
         return half4(0, 0, 0, 0);
     #endif
+}
+
+half4 SpeedTree7FragDepthNormal(SpeedTreeVertexDepthNormalOutput input) : SV_Target
+{
+    UNITY_SETUP_INSTANCE_ID(input);
+
+    #if !defined(SHADER_QUALITY_LOW)
+        #ifdef LOD_FADE_CROSSFADE // enable dithering LOD transition if user select CrossFade transition in LOD group
+            LODDitheringTransition(input.clipPos.xy, unity_LODFade.x);
+        #endif
+    #endif
+
+    half2 uv = input.uvHueVariation.xy;
+    half4 diffuse = SampleAlbedoAlpha(uv, TEXTURE2D_ARGS(_MainTex, sampler_MainTex));
+    diffuse.a *= _Color.a;
+
+    #ifdef SPEEDTREE_ALPHATEST
+        clip(diffuse.a - _Cutoff);
+    #endif
+
+    float3 normalWS = input.normalWS;
+    return float4(PackNormalOctRectEncode(TransformWorldToViewDir(normalWS, true)), 0.0, 0.0);
 }
 
 #endif
