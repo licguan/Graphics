@@ -1,13 +1,11 @@
-using UnityEngine.EventSystems;
-
-namespace UnityEngine.Experimental.Rendering
+namespace UnityEngine.Rendering
 {
-    public class DebugUpdater : MonoBehaviour
+    class DebugUpdater : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void RuntimeInit()
         {
-            if (FindObjectOfType<DebugUpdater>() != null)
+            if (!Debug.isDebugBuild || FindObjectOfType<DebugUpdater>() != null)
                 return;
 
             var go = new GameObject { name = "[Debug Updater]" };
@@ -25,7 +23,7 @@ namespace UnityEngine.Experimental.Rendering
         void Update()
         {
             DebugManager debugManager = DebugManager.instance;
-            
+
             debugManager.UpdateActions();
 
             if (debugManager.GetAction(DebugAction.EnableDebugMenu) != 0.0f)
