@@ -190,6 +190,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added remapping options for Depth Pyramid debug view mode
 - Added an option to support AOV shader at runtime in HDRP settings (case 1265070)
 - Supporting SSGI in the render graph mode.
+- Improving SSGI Filtering and fixing a blend issue with RTGI.
 
 ### Fixed
 - Fix when rescale probe all direction below zero (1219246)
