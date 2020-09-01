@@ -1,6 +1,4 @@
-using UnityEditor.Rendering;
-
-namespace UnityEngine.Rendering.LWRP
+namespace UnityEngine.Rendering.Universal.Internal
 {
     /// <summary>
     /// Copy the given color target to the current camera target
@@ -9,15 +7,12 @@ namespace UnityEngine.Rendering.LWRP
     /// the camera target. The pass takes the screen viewport into
     /// consideration.
     /// </summary>
-    internal class FinalBlitPass : ScriptableRenderPass
+    public class FinalBlitPass : ScriptableRenderPass
     {
         const string m_ProfilerTag = "Final Blit Pass";
+        private static readonly ProfilingSampler m_ProfilingSampler = new ProfilingSampler(m_ProfilerTag);
         RenderTargetHandle m_Source;
         Material m_BlitMaterial;
-        TextureDimension m_TargetDimension;
-        bool m_ClearBlitTarget;
-        bool m_IsMobileOrSwitch;
-        Rect m_PixelRect;
 
         int m_RangeMinId;
         int m_InverseRangeSizeId;
@@ -36,15 +31,9 @@ namespace UnityEngine.Rendering.LWRP
         /// </summary>
         /// <param name="baseDescriptor"></param>
         /// <param name="colorHandle"></param>
-        /// <param name="clearBlitTarget"></param>
-        /// <param name="pixelRect"></param>
-        public void Setup(RenderTextureDescriptor baseDescriptor, RenderTargetHandle colorHandle, bool clearBlitTarget = false, Rect pixelRect = new Rect())
+        public void Setup(RenderTextureDescriptor baseDescriptor, RenderTargetHandle colorHandle)
         {
             m_Source = colorHandle;
-            m_TargetDimension = baseDescriptor.dimension;
-            m_ClearBlitTarget = clearBlitTarget;
-            m_IsMobileOrSwitch = Application.isMobilePlatform || Application.platform == RuntimePlatform.Switch;
-            m_PixelRect = pixelRect;
         }
 
         /// <inheritdoc/>
@@ -56,76 +45,96 @@ namespace UnityEngine.Rendering.LWRP
                 return;
             }
 
-            bool requiresSRGBConvertion = Display.main.requiresSrgbBlitToBackbuffer;
-            bool killAlpha = renderingData.killAlphaInFinalBlit;
-
-            CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
-
-            if (DebugDisplaySettings.Instance.Validation.validationMode==DebugValidationMode.HiglightNanInfNegative)
-                cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_NAN_INF_NEGATIVE_PIXELS");
-            else
-                cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_NAN_INF_NEGATIVE_PIXELS");
-
-            if (DebugDisplaySettings.Instance.Validation.validationMode == DebugValidationMode.HighlightOutsideOfRange)
-            {
-                cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_PIXELS_OUTSIDE_RANGE");
-                cmd.SetGlobalFloat(m_RangeMinId, DebugDisplaySettings.Instance.Validation.RangeMin);
-                cmd.SetGlobalFloat(m_InverseRangeSizeId, DebugDisplaySettings.Instance.Validation.RangeMax);
-
-                if(DebugDisplaySettings.Instance.Validation.AlsoHighlightAlphaOutsideRange)
-                    cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_ALPHA_OUTSIDE_RANGE");
-                else
-                    cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_ALPHA_OUTSIDE_RANGE");
-            }
-            else
-            {
-                cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_PIXELS_OUTSIDE_RANGE");
-            }
-
-            if (requiresSRGBConvertion)
-                cmd.EnableShaderKeyword(ShaderKeywordStrings.LinearToSRGBConversion);
-            else
-                cmd.DisableShaderKeyword(ShaderKeywordStrings.LinearToSRGBConversion);
-
-            if (killAlpha)
-                cmd.EnableShaderKeyword(ShaderKeywordStrings.KillAlpha);
-            else
-                cmd.DisableShaderKeyword(ShaderKeywordStrings.KillAlpha);
-
+            // Note: We need to get the cameraData.targetTexture as this will get the targetTexture of the camera stack.
+            // Overlay cameras need to output to the target described in the base camera while doing camera stack.
             ref CameraData cameraData = ref renderingData.cameraData;
-            if ( (cameraData.isStereoEnabled || cameraData.isSceneViewCamera || cameraData.isDefaultViewport)
-                && (DebugDisplaySettings.Instance.Validation.validationMode==DebugValidationMode.None) )
+            RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CameraTarget;
+
+            bool isSceneViewCamera = cameraData.isSceneViewCamera;
+            CommandBuffer cmd = CommandBufferPool.Get();
+            using (new ProfilingScope(cmd, m_ProfilingSampler))
             {
-                // This set render target is necessary so we change the LOAD state to DontCare.
-                cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+	            if (DebugDisplaySettings.Instance.Validation.validationMode==DebugValidationMode.HiglightNanInfNegative)
+    	            cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_NAN_INF_NEGATIVE_PIXELS");
+        	    else
+            	    cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_NAN_INF_NEGATIVE_PIXELS");
 
-                // Clearing render target is cost free on mobile and it avoid tile loading
-                if (m_IsMobileOrSwitch)
-                    cmd.ClearRenderTarget(true, true, Color.black);
-                
-                cmd.Blit(m_Source.Identifier(), BuiltinRenderTextureType.CameraTarget);
-            }
-            else
-            {
-                cmd.SetGlobalTexture("_BlitTex", m_Source.Identifier());
+	            if (DebugDisplaySettings.Instance.Validation.validationMode == DebugValidationMode.HighlightOutsideOfRange)
+    	        {
+        	        cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_PIXELS_OUTSIDE_RANGE");
+            	    cmd.SetGlobalFloat(m_RangeMinId, DebugDisplaySettings.Instance.Validation.RangeMin);
+                	cmd.SetGlobalFloat(m_InverseRangeSizeId, DebugDisplaySettings.Instance.Validation.RangeMax);
 
-                // TODO: Final blit pass should always blit to backbuffer. The first time we do we don't need to Load contents to tile.
-                // We need to keep in the pipeline of first render pass to each render target to propertly set load/store actions.
-                // meanwhile we set to load so split screen case works.
-                SetRenderTarget(
-                    cmd,
-                    BuiltinRenderTextureType.CameraTarget,
-                    m_ClearBlitTarget ? RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
-                    RenderBufferStoreAction.Store,
-                    m_ClearBlitTarget ? ClearFlag.Color : ClearFlag.None,
-                    Color.black,
-                    m_TargetDimension);
+	                if(DebugDisplaySettings.Instance.Validation.AlsoHighlightAlphaOutsideRange)
+    	                cmd.EnableShaderKeyword("_DEBUG_HIGHLIGHT_ALPHA_OUTSIDE_RANGE");
+        	        else
+            	        cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_ALPHA_OUTSIDE_RANGE");
+	            }
+    	        else
+        	    {
+                	cmd.DisableShaderKeyword("_DEBUG_HIGHLIGHT_PIXELS_OUTSIDE_RANGE");
+            	}
 
-                Camera camera = cameraData.camera;
-                cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-                cmd.SetViewport(m_PixelRect != Rect.zero ? m_PixelRect : cameraData.camera.pixelRect);
-                cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, m_BlitMaterial);
-                cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.LinearToSRGBConversion,
+                    cameraData.requireSrgbConversion);
+
+                cmd.SetGlobalTexture(ShaderPropertyId.sourceTex, m_Source.Identifier());
+
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (cameraData.xr.enabled)
+                {
+                    int depthSlice = cameraData.xr.singlePassEnabled ? -1 : cameraData.xr.GetTextureArraySlice();
+                    cameraTarget =
+                        new RenderTargetIdentifier(cameraData.xr.renderTarget, 0, CubemapFace.Unknown, depthSlice);
+
+                    CoreUtils.SetRenderTarget(
+                        cmd,
+                        cameraTarget,
+                        RenderBufferLoadAction.Load,
+                        RenderBufferStoreAction.Store,
+                        ClearFlag.None,
+                        Color.black);
+
+                    cmd.SetViewport(cameraData.pixelRect);
+
+                    // We y-flip if
+                    // 1) we are bliting from render texture to back buffer(UV starts at bottom) and
+                    // 2) renderTexture starts UV at top
+                    bool yflip = !cameraData.xr.renderTargetIsRenderTexture && SystemInfo.graphicsUVStartsAtTop;
+                    Vector4 scaleBias = yflip ? new Vector4(1, -1, 0, 1) : new Vector4(1, 1, 0, 0);
+                    cmd.SetGlobalVector(ShaderPropertyId.scaleBias, scaleBias);
+
+                    cmd.DrawProcedural(Matrix4x4.identity, m_BlitMaterial, 0, MeshTopology.Quads, 4);
+                }
+                else
+#endif
+                if ((isSceneViewCamera || cameraData.isDefaultViewport) && (DebugDisplaySettings.Instance.Validation.validationMode==DebugValidationMode.None))
+                {
+                    // This set render target is necessary so we change the LOAD state to DontCare.
+                    cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget,
+                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, // color
+                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
+                    cmd.Blit(m_Source.Identifier(), cameraTarget, m_BlitMaterial);
+                }
+                else
+                {
+                    // TODO: Final blit pass should always blit to backbuffer. The first time we do we don't need to Load contents to tile.
+                    // We need to keep in the pipeline of first render pass to each render target to properly set load/store actions.
+                    // meanwhile we set to load so split screen case works.
+                    CoreUtils.SetRenderTarget(
+                        cmd,
+                        cameraTarget,
+                        RenderBufferLoadAction.Load,
+                        RenderBufferStoreAction.Store,
+                        ClearFlag.None,
+                        Color.black);
+
+                    Camera camera = cameraData.camera;
+                    cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+                    cmd.SetViewport(cameraData.pixelRect);
+                    cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, m_BlitMaterial);
+                    cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+                }
             }
 
             context.ExecuteCommandBuffer(cmd);
