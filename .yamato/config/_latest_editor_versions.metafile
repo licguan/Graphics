@@ -21,7 +21,7 @@ editor_versions:
       revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
       version: ''
     windows:
-      revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
+      revision: ef376aff2859d7502bf9ded55dcc5d01153ab991
       version: ''
   trunk_latest_public:
     android:
@@ -37,7 +37,7 @@ editor_versions:
       revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
       version: ''
     windows:
-      revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
+      revision: ef376aff2859d7502bf9ded55dcc5d01153ab991
       version: ''
   trunk_staging:
     android:
@@ -53,5 +53,5 @@ editor_versions:
       revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
       version: ''
     windows:
-      revision: 6f56d84adaf27a70878334e095397a3ed1fc53bf
+      revision: ef376aff2859d7502bf9ded55dcc5d01153ab991
       version: ''
